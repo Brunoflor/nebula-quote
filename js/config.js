@@ -12,7 +12,14 @@ export const CONFIG = {
     email: '',                       // es. 'ordini@nebula3d.it' – se vuoto l'email parte senza destinatario
   },
 
-  /** Volume di stampa della stampante in mm (X, Y, Z). Default: 256 x 256 x 256 */
+  /** Tecnologie disponibili: 'fdm' (filamento) e 'resin' (resina SLA/MSLA) */
+  technologies: {
+    fdm:   { label: 'Filamento (FDM)' },
+    resin: { label: 'Resina (SLA)' },
+  },
+  defaultTechnology: 'fdm',
+
+  /** Volume di stampa della stampante a FILAMENTO in mm (X, Y, Z). Default: 256 x 256 x 256 */
   buildVolume: { x: 256, y: 256, z: 256 },
 
   /** Valuta e IVA */
@@ -95,6 +102,97 @@ export const CONFIG = {
     { name: 'Azzurro',      hex: '#0ea5e9' },
     { name: 'Blu',          hex: '#3e63dd' },
   ],
+
+  /* ======================================================================
+   * RESINA (SLA / MSLA) – parametri separati dal filamento.
+   * Nella resina non esiste il riempimento: il pezzo è pieno oppure svuotato
+   * (guscio ≈ superficie × spessore parete). Il tempo dipende dall'ALTEZZA del
+   * pezzo (numero di layer), non dal volume: tutti i pezzi sul piatto
+   * vengono esposti insieme.
+   * ====================================================================== */
+  resin: {
+    /** Volume di stampa della stampante a resina in mm (X, Y, Z) */
+    buildVolume: { x: 218, y: 123, z: 235 },
+
+    /**
+     * Resine.
+     *  density     g/cm³
+     *  pricePerKg  € al kg di resina (≈ € al litro × densità)
+     */
+    materials: {
+      standard:  { label: 'Standard',          density: 1.12, pricePerKg: 38, note: 'Dettagli finissimi, ideale per miniature e figure' },
+      abslike:   { label: 'ABS-like',          density: 1.15, pricePerKg: 45, note: 'Meno fragile della standard, buona per parti funzionali' },
+      tough:     { label: 'Tough',             density: 1.18, pricePerKg: 65, note: 'Alta resistenza a urti e flessione' },
+      waterwash: { label: 'Lavabile in acqua', density: 1.10, pricePerKg: 42, note: 'Si lava con acqua invece che alcol isopropilico' },
+    },
+
+    /** Altezze layer (mm) con il tempo per layer di una mono LCD (esposizione + sollevamento) */
+    layerHeights: {
+      '0.025': { label: '0.025 mm – ultra fine', secondsPerLayer: 2.5 },
+      '0.05':  { label: '0.05 mm – standard',    secondsPerLayer: 2.8 },
+      '0.1':   { label: '0.10 mm – veloce',      secondsPerLayer: 3.0 },
+    },
+
+    /** Resina extra per supporti, base e scarto (0.12 = +12%) */
+    supportWaste: 0.12,
+
+    /** Spessore parete di default quando il pezzo è svuotato (mm) e limiti */
+    defaultWallMm: 2,
+    minWallMm: 0.8,
+    maxWallMm: 6,
+
+    /** Tempo fisso per ogni stampa (piatto): livellamento vasca, primi layer di base (minuti) */
+    overheadMinutesPerPlate: 10,
+
+    /** Frazione del piatto utilizzabile per disporre più pezzi (supporti, distanze) */
+    plateUsage: 0.6,
+
+    /** Tariffa oraria della stampante a resina in €/h (schermo LCD, FEP, energia) */
+    machineRatePerHour: 2.5,
+
+    /** Post-produzione per pezzo in €: lavaggio, polimerizzazione UV, rimozione supporti */
+    postProcessPerPart: 2.5,
+
+    /** Colori resina disponibili */
+    colors: [
+      { name: 'Grigio',      hex: '#9aa0a8' },
+      { name: 'Nero',        hex: '#1f1f24' },
+      { name: 'Bianco',      hex: '#f2f2f2' },
+      { name: 'Beige pelle', hex: '#e8c39e' },
+      { name: 'Trasparente', hex: '#b9e6f5' },
+      { name: 'Viola Nebula', hex: '#8b5cf6' },
+    ],
+
+    /** Valori iniziali quando si passa alla resina */
+    defaults: { material: 'standard', layer: '0.05', hollow: false, wall: 2, color: 'Grigio' },
+  },
+
+  /* ======================================================================
+   * DA FOTO → MODELLO 3D (IA)
+   * Usa Space pubblici di Hugging Face, gratuiti e senza chiave, chiamati
+   * direttamente dal browser con @gradio/client. Se il primo fallisce o va in
+   * timeout si passa automaticamente al successivo.
+   * Nota: gli Space ZeroGPU hanno una quota gratuita giornaliera per IP.
+   * ====================================================================== */
+  photoTo3D: {
+    spaces: [
+      {
+        id: 'tencent/Hunyuan3D-2', label: 'Hunyuan3D-2', endpoint: '/shape_generation',
+        params: { caption: '', steps: 30, guidance_scale: 5, seed: 1234, octree_resolution: 256, check_box_rembg: true, num_chunks: 8000, randomize_seed: true },
+        typicalSeconds: 15, maskBackground: false,
+      },
+      {
+        id: 'tencent/Hunyuan3D-2.1', label: 'Hunyuan3D-2.1', endpoint: '/shape_generation',
+        params: { steps: 30, guidance_scale: 5, seed: 1234, octree_resolution: 256, check_box_rembg: true, num_chunks: 8000, randomize_seed: true },
+        typicalSeconds: 30, maskBackground: true, // questo Space tiene lo sfondo come una lastra: lo togliamo noi prima
+      },
+    ],
+    connectTimeoutSec: 30,      // tempo massimo per collegarsi a uno Space
+    timeoutSec: 240,            // tempo massimo per una generazione (coda inclusa) prima di passare al successivo
+    maxImageSide: 1024,         // la foto viene ridimensionata a questo lato massimo prima dell'invio
+    defaultSizeMm: 80,          // dimensione reale proposta per il modello generato
+    defaultSizeMode: 'height',  // 'height' = altezza, 'longest' = lato più lungo
+  },
 
   /** Valori iniziali del form */
   defaults: { material: 'PLA', infill: 20, layer: '0.2', quality: 'standard', quantity: 1, color: 'Viola Nebula', unit: 'mm' },
