@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nebula 3D · Preventivo istantaneo stampa 3D</title>
+  <meta name="description" content="Carica un file STL e ottieni subito una stima di prezzo, peso e tempi di stampa 3D da Nebula 3D.">
+  <meta name="theme-color" content="#0b0a14">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a78bfa'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M32 4 58 18v28L32 60 6 46V18z' fill='url(%23g)'/%3E%3Cpath d='M32 4v56M6 18l26 14 26-14' stroke='%230b0a14' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Nebula 3D">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><path d="M32 4 58 18v28L32 60 6 46V18z" fill="url(#lg)"/><path d="M32 4v56M6 18l26 14 26-14" stroke="#0b0a14" stroke-width="3" fill="none"/></svg>
+      <span class="brand-text">NEBULA<span>3D</span></span>
+    </a>
+    <a class="ig" href="https://www.instagram.com/nebula3dlab/" target="_blank" rel="noopener">@nebula3dlab</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Preventivo <span class="grad">istantaneo</span> per la tua stampa 3D</h1>
+      <p>Carica un file STL: calcoliamo volume, peso, tempi e prezzo direttamente nel browser. Il file non lascia mai il tuo dispositivo.</p>
+    </section>
+
+    <div class="layout">
+      <section class="card viewer-card">
+        <div id="viewer" class="viewer">
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Carica un file STL">
+            <svg viewBox="0 0 24 24" class="dz-icon" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <strong>Trascina qui il tuo file STL</strong>
+            <span>oppure</span>
+            <div class="dz-actions">
+              <label class="btn btn-primary">Scegli file<input id="file" type="file" accept=".stl,model/stl,application/sla" hidden></label>
+              <button id="sample" class="btn btn-ghost" type="button">Prova con un esempio</button>
+            </div>
+            <small>STL binario o ASCII · elaborato in locale</small>
+          </div>
+          <div id="viewer-toolbar" class="viewer-toolbar" hidden>
+            <span id="filename" class="filename"></span>
+            <div class="tb-actions">
+              <button id="sample2" class="chip" type="button" title="Carica l'altro esempio">Altro esempio</button>
+              <button id="reset-view" class="chip" type="button" title="Centra la vista">Centra</button>
+              <label class="chip">Cambia file<input id="file2" type="file" accept=".stl" hidden></label>
+            </div>
+          </div>
+          <div id="drag-overlay" class="drag-overlay" hidden><strong>Rilascia per caricare</strong></div>
+          <div id="loading" class="loading" hidden><div class="spinner"></div><span>Analisi del modello…</span></div>
+        </div>
+        <div id="warnings"></div>
+        <dl id="stats" class="stats">
+          <div><dt>Dimensioni</dt><dd id="s-size">—</dd></div>
+          <div><dt>Volume</dt><dd id="s-volume">—</dd></div>
+          <div><dt>Superficie</dt><dd id="s-area">—</dd></div>
+          <div><dt>Triangoli</dt><dd id="s-tris">—</dd></div>
+        </dl>
+      </section>
+
+      <aside class="side">
+        <section class="card settings">
+          <h2>Impostazioni</h2>
+          <div class="field">
+            <span class="label">Materiale</span>
+            <div id="materials" class="segmented" role="radiogroup" aria-label="Materiale"></div>
+            <small id="material-note" class="hint"></small>
+          </div>
+          <div class="field">
+            <label class="label" for="infill">Riempimento <output id="infill-out">20%</output></label>
+            <input id="infill" type="range" min="0" max="100" step="5" value="20">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label class="label" for="layer">Altezza layer</label>
+              <select id="layer"></select>
+            </div>
+            <div class="field">
+              <label class="label" for="quality">Qualità</label>
+              <select id="quality"></select>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label class="label" for="quantity">Quantità</label>
+              <div class="stepper">
+                <button type="button" data-step="-1" aria-label="Diminuisci">−</button>
+                <input id="quantity" type="number" min="1" max="999" value="1" inputmode="numeric">
+                <button type="button" data-step="1" aria-label="Aumenta">+</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label" for="unit">Unità del file</label>
+              <select id="unit">
+                <option value="mm">millimetri</option>
+                <option value="cm">centimetri</option>
+                <option value="in">pollici</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <span class="label">Colore <output id="color-out"></output></span>
+            <div id="colors" class="swatches" role="radiogroup" aria-label="Colore"></div>
+          </div>
+        </section>
+
+        <section class="card quote" id="quote">
+          <div class="quote-head">
+            <h2>Preventivo</h2>
+            <span class="badge">Stima</span>
+          </div>
+          <div class="total">
+            <span id="q-total" class="total-price">— €</span>
+            <span id="q-vat" class="total-vat">Carica un modello per iniziare</span>
+          </div>
+          <div class="kpis">
+            <div><span>Filamento</span><strong id="q-weight">—</strong></div>
+            <div><span>Tempo stampa</span><strong id="q-time">—</strong></div>
+            <div><span>Per pezzo</span><strong id="q-unit">—</strong></div>
+          </div>
+          <details class="breakdown" open>
+            <summary>Dettaglio costi</summary>
+            <table id="q-breakdown"><tbody><tr><td colspan="2" class="muted">Nessun modello caricato</td></tr></tbody></table>
+          </details>
+          <button id="request" class="btn btn-primary btn-block" type="button" disabled>Richiedi stampa</button>
+          <p class="disclaimer">Valori stimati e indicativi, IVA esclusa salvo dove indicato. Il prezzo finale viene confermato da Nebula 3D dopo lo slicing del modello.</p>
+        </section>
+      </aside>
+    </div>
+
+    <section class="how card">
+      <h2>Come calcoliamo la stima</h2>
+      <ol>
+        <li><strong>Geometria.</strong> Il volume si ottiene sommando i tetraedri con segno formati da ogni triangolo con l'origine; la superficie sommando le aree dei triangoli.</li>
+        <li><strong>Filamento.</strong> Guscio ≈ superficie × spessore pareti; interno ≈ volume restante × riempimento. Peso = volume plastica × densità del materiale + scarto.</li>
+        <li><strong>Tempo.</strong> Volume plastica ÷ portata volumetrica (corretta per layer e qualità) + cambi layer + preparazione macchina.</li>
+        <li><strong>Prezzo.</strong> (materiale + ore macchina) × quantità − eventuale sconto + costo fisso di preparazione.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>© <span id="year"></span> Nebula 3D · Stampa 3D su misura</span>
+    <a href="https://www.instagram.com/nebula3dlab/" target="_blank" rel="noopener">Instagram @nebula3dlab</a>
+  </footer>
+
+  <dialog id="request-dialog" class="dialog">
+    <form method="dialog" class="dialog-inner">
+      <h2>Richiedi la stampa</h2>
+      <p class="muted">Ecco il riepilogo del preventivo. Invialo a Nebula 3D via Instagram o email e allega il file STL.</p>
+      <textarea id="summary" rows="12" readonly></textarea>
+      <div class="dialog-actions">
+        <button id="send-ig" class="btn btn-primary" type="button">Copia e apri Instagram</button>
+        <a id="send-mail" class="btn btn-ghost" href="#">Invia via email</a>
+        <button class="btn btn-text" value="close">Chiudi</button>
+      </div>
+      <p id="copy-status" class="hint" role="status"></p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
