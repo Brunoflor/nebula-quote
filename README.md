@@ -6,9 +6,12 @@ Web app statica di [Nebula 3D](https://www.instagram.com/nebula3dlab/) (@nebula3
 
 ![Modalità Da foto](screenshot-foto.png)
 
+![Progetto con più parti](screenshot-progetto.png)
+
 ## Funzionalità
 
-- Trascina e rilascia (o scegli) un file STL, **binario o ASCII**; pulsante **"Prova con un esempio"** con due modelli inclusi (vaso e cubo da 20 mm).
+- Trascina e rilascia (o scegli) uno o più file STL, **binari o ASCII**; pulsante **"Prova con un esempio"** con due modelli inclusi (vaso e cubo da 20 mm).
+- **Progetto con più parti**: ogni STL (e, se vuoi, un modello da foto) è una parte con tecnologia, materiale, layer, qualità o svuotamento, colore e quantità propri. Il preventivo mostra il costo, il peso e il tempo di ogni parte e **un solo totale** per l'ordine.
 - Anteprima 3D con rotazione, zoom e pan (three.js + OrbitControls, inclusi nel progetto: funziona offline).
 - Calcolo di volume, superficie e ingombro in mm; avviso se il pezzo supera il volume di stampa (default 256 × 256 × 256 mm).
 - **Due tecnologie**: interruttore *Filamento (FDM)* / *Resina (SLA)*, valido sia per gli STL sia per i modelli da foto.
@@ -43,6 +46,19 @@ Costanti nel blocco `resin` di `js/config.js` (materiali con densità 1,10–1,1
 2. **Tempo**: dipende solo dall'**altezza** (si espone un layer intero alla volta): `layer = ⌈altezza / altezza layer⌉`, tempo = layer × secondi per layer (2,5–3 s, LCD mono) + 10 minuti di preparazione per stampa. Più pezzi uguali stanno insieme sul piatto (fino al 60% della sua area), quindi la quantità aumenta il tempo solo quando servono più stampe.
 3. **Prezzo**: costo resina + ore × tariffa macchina resina (€/h separata) + **post-produzione** per pezzo (lavaggio e polimerizzazione UV), poi sconto quantità, preparazione, ordine minimo e IVA come per l'FDM.
 4. Se il pezzo non entra nel volume della stampante a resina compare l'avviso, come per l'FDM.
+
+### Progetto con più parti
+
+Si possono mettere nello stesso ordine più parti, anche miste filamento e resina. Il modello è in `estimateProject()` (`js/estimate.js`); l'interfaccia tiene l'elenco nel pannello **Parti del progetto**.
+
+- **Aggiungere.** Il primo file caricato è la parte 1. **«Aggiungi parte»** prepara una nuova riga (quantità 1, stesse impostazioni di partenza della parte corrente): poi si carica un STL, si sceglie un esempio, oppure si passa a **Da foto**. Si possono anche selezionare o trascinare **più STL insieme**: ognuno diventa una parte e non sostituisce quelle già presenti. **«Cambia file»** sostituisce solo la parte aperta.
+- **Modificare, duplicare, togliere.** Si seleziona una parte (o **Modifica**) e il pannello Impostazioni vale solo per lei. **Duplica** ne fa una copia indipendente. **Rimuovi** la toglie dal totale. Con una sola parte il prezzo è **identico** al preventivo di prima.
+- **Costo di riga.** Per ogni parte: materiale, tempo macchina, post-produzione (se resina) e lo **sconto quantità di quella parte**. Nel riepilogo questo importo è *senza* preparazione e *senza* ordine minimo.
+- **Totale.** Si sommano i costi di riga, si aggiunge **una volta** il costo di preparazione (`setupFee`), si applica **una volta** l'ordine minimo (`minimumOrder`) e l'IVA (`vatRate`, mostrata a parte come oggi). Peso e tempo di stampa sono la somma delle parti.
+- **Sconto quantità.** Si guarda la quantità **di quella parte**, non la somma delle quantità del progetto. Cinque copie di A e cinque di B prendono il 5% ciascuna, non il 10% che spetterebbe a dieci pezzi uguali. Sei parti diverse da un pezzo non scontano nulla.
+- **Resina e piatti.** Le copie della **stessa** parte continuano a condividere il piatto (l'overhead di preparazione vasca si paga per ogni stampa, non per ogni pezzo). **Parti diverse non condividono il piatto**, anche se ci starebbero e usano la stessa resina: layer, materiale e colore possono differire, e il costo di una riga non deve cambiare quando se ne aggiunge un'altra. I tempi delle parti si sommano.
+- **Filamento.** Le parti si stampano una dopo l'altra: i tempi si sommano, overhead per pezzo compreso.
+- **«Richiedi stampa».** Con una parte il testo è quello di sempre. Con più parti elenca ogni parte (file o foto, misure, tecnologia, materiale, quantità, costo, peso, tempo) e il totale di progetto, preparazione inclusa una volta sola.
 
 ### Da foto: modello 3D generato con IA
 
@@ -94,6 +110,7 @@ Il file `.nojekyll` evita che GitHub Pages elabori il sito con Jekyll. Tutti i p
 ```bash
 node tests/geometry.test.mjs       # volumi e aree di forme note (cubo 20 mm = 8 cm³, cilindro, vaso)
 node tests/resin.test.mjs          # calcoli resina: pieno/svuotato, layer, piatti, prezzo, volume
+node tests/project.test.mjs        # progetto: una parte = preventivo singolo; preparazione e minimo una volta; sconto per parte; piatti resina non condivisi fra parti diverse
 npm i puppeteer-core               # solo per i test nel browser
 python3 -m http.server 8765 & node tests/e2e.mjs   # end-to-end: STL, FDM↔resina, foto con IA simulata (?mock3d=1), riserva, annulla, Scarica STL, mobile
 node tests/e2e-real.mjs            # UNA generazione reale da foto con tempi (consuma quota ZeroGPU)
@@ -108,7 +125,7 @@ index.html            pagina
 css/style.css         stile
 js/config.js          tutte le costanti di prezzo e stima
 js/geometry.js        parsing STL, volume, superficie, ingombro
-js/estimate.js        modello di stima FDM e resina
+js/estimate.js        modello di stima FDM, resina e totale di progetto
 js/photo3d.js         foto → modello 3D (Hugging Face Spaces, GLB → mesh)
 js/stl-export.js      esportazione STL binario
 js/app.js             interfaccia e anteprima 3D
