@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nebula 3D · Preventivo istantaneo stampa 3D</title>
-  <meta name="description" content="Carica un file STL o la foto di un oggetto e ottieni subito una stima di prezzo, peso e tempi di stampa 3D (filamento o resina) da Nebula 3D.">
+  <meta name="description" content="Carica uno o più file STL, o la foto di un oggetto, e ottieni un preventivo di progetto: peso, tempi e prezzo per filamento o resina da Nebula 3D.">
   <meta name="theme-color" content="#0b0a14">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a78bfa'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M32 4 58 18v28L32 60 6 46V18z' fill='url(%23g)'/%3E%3Cpath d='M32 4v56M6 18l26 14 26-14' stroke='%230b0a14' stroke-width='3' fill='none'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
@@ -22,12 +22,17 @@
   <main>
     <section class="hero">
       <h1>Preventivo <span class="grad">istantaneo</span> per la tua stampa 3D</h1>
-      <p>Carica un file STL oppure la foto di un oggetto: calcoliamo volume, peso, tempi e prezzo per filamento o resina, direttamente nel browser.</p>
+      <p>Carica uno o più file STL, oppure la foto di un oggetto: ogni parte ha le sue impostazioni e ottieni un unico totale di peso, tempi e prezzo, direttamente nel browser.</p>
     </section>
 
     <div class="mode-switch" role="tablist" aria-label="Da cosa partire">
       <button id="mode-stl" role="tab" type="button" aria-selected="true">Da file STL</button>
       <button id="mode-photo" role="tab" type="button" aria-selected="false">Da foto <span class="tag">IA · nuovo</span></button>
+    </div>
+
+    <div id="add-banner" class="alert info add-banner" hidden>
+      <span>Nuova parte: carica un STL oppure passa a «Da foto». Le impostazioni a fianco valgono per questa parte e la quantità parte da 1.</span>
+      <button id="cancel-add" class="btn btn-text btn-sm" type="button">Annulla</button>
     </div>
 
     <div class="layout">
@@ -38,7 +43,7 @@
             <strong id="dz-title">Trascina qui il tuo file STL</strong>
             <span>oppure</span>
             <div class="dz-actions">
-              <label class="btn btn-primary"><span id="dz-pick">Scegli file</span><input id="file" type="file" accept=".stl,model/stl,application/sla" hidden></label>
+              <label class="btn btn-primary"><span id="dz-pick">Scegli file</span><input id="file" type="file" accept=".stl,model/stl,application/sla" multiple hidden></label>
               <button id="sample" class="btn btn-ghost" type="button">Prova con un esempio</button>
             </div>
             <small id="dz-hint">STL binario o ASCII · elaborato in locale</small>
@@ -95,7 +100,7 @@
 
       <aside class="side">
         <section class="card settings">
-          <h2>Impostazioni</h2>
+          <h2 id="settings-title">Impostazioni</h2>
           <div class="field">
             <span class="label">Tecnologia</span>
             <div id="tech" class="segmented seg2" role="radiogroup" aria-label="Tecnologia di stampa"></div>
@@ -155,7 +160,7 @@
 
         <section class="card quote" id="quote">
           <div class="quote-head">
-            <h2>Preventivo</h2>
+            <h2 id="quote-title">Preventivo</h2>
             <span class="badge">Stima</span>
           </div>
           <div class="total">
@@ -165,7 +170,17 @@
           <div class="kpis">
             <div><span id="k-weight">Filamento</span><strong id="q-weight">—</strong></div>
             <div><span>Tempo stampa</span><strong id="q-time">—</strong></div>
-            <div><span>Per pezzo</span><strong id="q-unit">—</strong></div>
+            <div><span id="k-unit">Per pezzo</span><strong id="q-unit">—</strong></div>
+          </div>
+          <div id="project" class="project">
+            <div class="project-head">
+              <h3>Parti del progetto</h3>
+              <span id="project-count" class="badge badge-quiet">Nessuna parte</span>
+            </div>
+            <ol id="project-list" class="part-list"></ol>
+            <p id="project-empty" class="hint">Carica un STL o una foto: diventa la prima parte. Con «Aggiungi parte» ne metti altre nello stesso ordine, ognuna con tecnologia, materiale e quantità propri.</p>
+            <p id="project-rules" class="hint" hidden>Lo sconto quantità vale per ogni parte, in base alla sua quantità (non si sommano parti diverse). Preparazione, ordine minimo e IVA si applicano una sola volta. In resina le copie della stessa parte condividono il piatto; parti diverse restano su piatti separati. Il costo in riga è senza preparazione.</p>
+            <button id="add-part" class="btn btn-ghost btn-block" type="button" disabled>Aggiungi parte</button>
           </div>
           <details class="breakdown" open>
             <summary>Dettaglio costi</summary>
@@ -184,6 +199,7 @@
         <li><strong>Filamento.</strong> Guscio ≈ superficie × spessore pareti; interno ≈ volume restante × riempimento. Peso = volume plastica × densità del materiale + scarto.</li>
         <li><strong>Tempo.</strong> Volume plastica ÷ portata volumetrica (corretta per layer e qualità) + cambi layer + preparazione macchina.</li>
         <li><strong>Prezzo.</strong> (materiale + ore macchina) × quantità − eventuale sconto + costo fisso di preparazione.</li>
+        <li><strong>Progetto.</strong> Più parti nello stesso ordine: ognuna tiene tecnologia, materiale, layer, qualità o svuotamento, colore e quantità, con il suo peso, tempo e costo. Preparazione, ordine minimo e IVA si contano una volta sola. Lo sconto quantità si calcola sulla quantità di ciascuna parte. In resina le copie uguali condividono il piatto; parti diverse no.</li>
         <li><strong>Resina (SLA).</strong> Nessun riempimento: pezzo pieno oppure svuotato (guscio ≈ superficie × spessore parete), + scarto per i supporti. Il tempo dipende dall'altezza: numero di layer × secondi per layer, e i pezzi sullo stesso piatto si stampano insieme. Si aggiunge la post-produzione (lavaggio e polimerizzazione UV).</li>
         <li><strong>Da foto (IA).</strong> La foto viene inviata a un modello di IA pubblico su Hugging Face (Hunyuan3D-2, con Hunyuan3D-2.1 come riserva) che ricostruisce una mesh 3D. La forma è approssimativa: tu imposti la misura reale e il preventivo si calcola come per un STL.</li>
       </ol>

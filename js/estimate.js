@@ -123,6 +123,60 @@ export function estimateQuote(stats, opts, CONFIG) {
   return opts.tech === 'resin' ? estimateResin(stats, opts, CONFIG) : { tech: 'fdm', ...estimate(stats, opts, CONFIG) };
 }
 
+/**
+ * Preventivo di un PROGETTO fatto di più parti.
+ * `parts` è un array di { stats, opts } con gli stessi opts di estimateQuote
+ * (tech, material, quantity, e i parametri FDM o resina di quella parte).
+ *
+ * Regole (una parte sola deve coincidere con estimateQuote):
+ * - Ogni parte si stima da sola: materiale, tempo, post-produzione, sconto
+ *   quantità sulla SUA quantità, e — in resina — i piatti solo tra le copie
+ *   di quella stessa parte. Il costo riga (`lineNet`) è
+ *   partsSubtotal − sconto, senza preparazione né ordine minimo.
+ * - Lo sconto quantità NON somma le quantità di parti diverse: 5+5 pezzi
+ *   diversi prendono il 5% ciascuno, non il 10% di una riga da 10.
+ * - In resina parti diverse non condividono il piatto (layer, resina e colore
+ *   possono cambiare, e il costo di una riga non deve dipendere dalle altre).
+ *   Le copie della stessa parte continuano a stare insieme, come oggi.
+ * - In FDM i tempi si sommano: le parti si stampano una dopo l'altra e
+ *   l'overhead per pezzo resta dentro il tempo di ogni parte.
+ * - Preparazione (`setupFee`), ordine minimo e IVA si applicano UNA volta
+ *   sul progetto: netto = max(somma dei lineNet + preparazione, minimo).
+ */
+export function estimateProject(parts, CONFIG) {
+  if (!parts?.length) throw new Error('Il progetto non ha parti');
+  const lines = parts.map((p, index) => {
+    const q = estimateQuote(p.stats, p.opts, CONFIG);
+    const lineNet = q.partsSubtotal - q.discount;
+    return { ...q, index, lineNet };
+  });
+  const partsSubtotal = lines.reduce((s, l) => s + l.partsSubtotal, 0);
+  const discount = lines.reduce((s, l) => s + l.discount, 0);
+  const linesNet = partsSubtotal - discount;
+  let net = linesNet + CONFIG.setupFee;
+  const minimumApplied = net < CONFIG.minimumOrder;
+  const minimumTopUp = minimumApplied ? CONFIG.minimumOrder - net : 0;
+  net = Math.max(net, CONFIG.minimumOrder);
+  const vat = CONFIG.showVat ? net * CONFIG.vatRate : 0;
+  return {
+    lines,
+    partCount: lines.length,
+    qty: lines.reduce((s, l) => s + l.qty, 0),
+    totalGrams: lines.reduce((s, l) => s + l.totalGrams, 0),
+    totalMl: lines.reduce((s, l) => s + (l.tech === 'resin' ? l.totalMl : 0), 0),
+    totalSec: lines.reduce((s, l) => s + l.totalSec, 0),
+    partsSubtotal,
+    discount,
+    linesNet,
+    setupFee: CONFIG.setupFee,
+    minimumApplied,
+    minimumTopUp,
+    net,
+    vat,
+    gross: net + vat,
+  };
+}
+
 export function formatDuration(sec) {
   const m = Math.round(sec / 60);
   if (m < 60) return `${m} min`;
